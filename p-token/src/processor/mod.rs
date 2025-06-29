@@ -1,7 +1,7 @@
 use {
     core::{slice::from_raw_parts, str::from_utf8_unchecked},
     pinocchio::{
-        account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey,
+        account_info::AccountInfo, memory::sol_memcmp, program_error::ProgramError, pubkey::Pubkey,
         syscalls::sol_memcpy_, ProgramResult,
     },
     spl_token_interface::{
@@ -67,22 +67,13 @@ pub use {
 /// Number of bytes in a `u64`.
 const U64_BYTES: usize = core::mem::size_of::<u64>();
 
-/// SIMD-optimized pubkey comparison function.
-/// 
-/// Uses 64-bit chunks for faster memory comparison, reducing compute unit usage
-/// by ~5-6% compared to standard Pubkey equality checks.
+/// Checks two pubkeys for equality in a computationally cheap way using
+/// `sol_memcmp`
 #[inline(always)]
 pub fn pubkeys_eq(a: &Pubkey, b: &Pubkey) -> bool {
-    let a_chunks = unsafe { core::slice::from_raw_parts(a.as_ptr() as *const u64, 4) };
-    let b_chunks = unsafe { core::slice::from_raw_parts(b.as_ptr() as *const u64, 4) };
-
-    // Iterate over chunks with early exit
-    for i in 0..4 {
-        if a_chunks[i] != b_chunks[i] {
-            return false;
-        }
+    unsafe {
+        sol_memcmp(a.as_ref(), b.as_ref(), 32) == 0
     }
-    true
 }
 
 /// Maximum number of digits in a formatted `u64`.
