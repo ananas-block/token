@@ -70,12 +70,14 @@ const U64_BYTES: usize = core::mem::size_of::<u64>();
 /// Optimized pubkey comparison with 64-bit chunks.
 #[inline(always)]
 pub fn pubkeys_eq(a: &Pubkey, b: &Pubkey) -> bool {
-    let a_chunks = unsafe { from_raw_parts(a.as_ptr() as *const u64, 4) };
-    let b_chunks = unsafe { from_raw_parts(b.as_ptr() as *const u64, 4) };
+    let a_ptr = a.as_ptr() as *const u64;
+    let b_ptr = b.as_ptr() as *const u64;
 
     // Iterate over chunks to exit early.
     for i in 0..4 {
-        if a_chunks[i] != b_chunks[i] {
+        let a_value = unsafe { a_ptr.add(i).read_unaligned() };
+        let b_value = unsafe { b_ptr.add(i).read_unaligned() };
+        if a_value != b_value {
             return false;
         }
     }
