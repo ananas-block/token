@@ -67,6 +67,23 @@ pub use {
 /// Number of bytes in a `u64`.
 const U64_BYTES: usize = core::mem::size_of::<u64>();
 
+/// Optimized pubkey comparison with 64-bit chunks.
+#[inline(always)]
+pub fn pubkeys_eq(a: &Pubkey, b: &Pubkey) -> bool {
+    let a_ptr = a.as_ptr() as *const u64;
+    let b_ptr = b.as_ptr() as *const u64;
+
+    // Iterate over chunks to exit early.
+    for i in 0..4 {
+        let a_value = unsafe { a_ptr.add(i).read_unaligned() };
+        let b_value = unsafe { b_ptr.add(i).read_unaligned() };
+        if a_value != b_value {
+            return false;
+        }
+    }
+    true
+}
+
 /// Maximum number of digits in a formatted `u64`.
 ///
 /// The maximum number of digits is equal to the maximum number
@@ -96,7 +113,7 @@ fn validate_owner(
     owner_account_info: &AccountInfo,
     signers: &[AccountInfo],
 ) -> ProgramResult {
-    if expected_owner != owner_account_info.key() {
+    if !pubkeys_eq(expected_owner, owner_account_info.key()) {
         return Err(TokenError::OwnerMismatch.into());
     }
 
@@ -115,7 +132,7 @@ fn validate_owner(
 
         for signer in signers.iter() {
             for (position, key) in multisig.signers[0..multisig.n as usize].iter().enumerate() {
-                if key == signer.key() && !matched[position] {
+                if pubkeys_eq(key, signer.key()) && !matched[position] {
                     if !signer.is_signer() {
                         return Err(ProgramError::MissingRequiredSignature);
                     }
